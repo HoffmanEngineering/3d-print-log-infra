@@ -19,6 +19,13 @@ variable "alerts_email" {
   description = "Inbox that receives SES reputation alarms. Sensitive because plans are posted to public PRs."
   type        = string
   sensitive   = true
+
+  # An unset or empty ALERTS_EMAIL secret reaches Terraform as "". Catch it at plan time; being
+  # sensitive, the value itself is never printed.
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alerts_email))
+    error_message = "alerts_email must be an email address. Set the ALERTS_EMAIL repository secret."
+  }
 }
 
 variable "dmarc_rua" {
