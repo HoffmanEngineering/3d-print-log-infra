@@ -28,7 +28,7 @@ The hosted zone has `prevent_destroy`, and the apply role cannot delete zones.
 | `domain` | Sending domain | — |
 | `mail_from_subdomain` | MAIL FROM label | `bounce` |
 | `dmarc_rua` | DMARC aggregate report URI | — |
-| `dkim_signing_hosted_zone` | SES DKIM signing zone for the region (`dkim.amazonses.com` in `us-east-1`) | — |
+| `dkim_signing_hosted_zone` | SES DKIM signing zone for the region (`dkim.amazonses.com` in `us-east-1` and `us-east-2`) | — |
 | `event_webhook_url` | API endpoint for SES events; null = no subscription | `null` |
 | `sender_user_name` | IAM user the API sends as | — |
 | `sender_permissions_boundary_arn` | Boundary bootstrap creates for the sender user | — |

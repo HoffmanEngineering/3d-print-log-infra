@@ -137,7 +137,7 @@ AZURE_PLAN_CLIENT_ID="$(ensure_azure_principal "$PLAN_APP_NAME" "$PLAN_SUBJECT" 
 
 # --- AWS: OIDC provider and roles -------------------------------------------------------------
 AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_REGION="${AWS_REGION:-us-east-2}"
 OIDC_PROVIDER_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${GITHUB_OIDC_HOST}"
 
 if ! aws iam get-open-id-connect-provider --open-id-connect-provider-arn "$OIDC_PROVIDER_ARN" >/dev/null 2>&1; then

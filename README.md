@@ -8,6 +8,20 @@ The first resident is the AWS SES email stack. The existing Azure resources (App
 Storage, Static Web Apps) will be imported here over time, one resource group at a time, with
 `import` blocks so nothing is recreated.
 
+## The AWS project
+
+AWS hosts this stack in a project from AWS's newer sign-up experience. A project is a single account
+that AWS manages inside its own organization. Two things follow from that:
+
+- **Region is fixed at `us-east-2` (Ohio).** AWS's managed service control policies deny regional
+  resources anywhere else, so `aws_region` is pinned by validation.
+- **Human access is `aws login`, not IAM users or Identity Center.** Use the `printlog` profile
+  (`aws login --region us-east-2 --profile printlog`). The only IAM user is the API's SES sender,
+  which is programmatic-only.
+
+A spend limit can be set per project in AWS Settings. If it is ever exceeded, AWS pauses the project
+and SES stops sending until it is raised.
+
 ## Layout
 
 ```
@@ -53,7 +67,7 @@ These cannot be automated, or are deliberately manual. Do them in order.
 7. [ ] **Request SES production access:**
 
        ```bash
-       aws sesv2 put-account-details --production-access-enabled --mail-type MARKETING \
+       AWS_PROFILE=printlog AWS_REGION=us-east-2 aws sesv2 put-account-details --production-access-enabled --mail-type MARKETING \
          --website-url https://www.3dprintlog.com --contact-language EN \
          --use-case-description "3D Print Log (a free hobbyist 3D-printing logbook) sends account-activity email to its own registered users: an onboarding series for new signups, a monthly recap of each user's own print statistics, and an alert when a user's connected printer stops reporting. Recipients are verified account addresses only, never purchased lists. Every message carries RFC 8058 one-click unsubscribe plus per-category preferences, users are shown an in-app notice before any email is sent, and permanent bounces and complaints are suppressed automatically from SES event notifications. Expected volume is a few hundred messages per day, ramping to about 5,000 on the first of each month."
        ```
@@ -71,7 +85,7 @@ These cannot be automated, or are deliberately manual. Do them in order.
 
        App Service settings: `Email__Ses__AccessKeyId`, `Email__Ses__SecretAccessKey` (ideally as a
        Key Vault reference, so the secret is not readable by anyone with App Service config access),
-       `Email__Ses__Region=us-east-1`, `Email__Ses__ConfigurationSet` (output
+       `Email__Ses__Region=us-east-2`, `Email__Ses__ConfigurationSet` (output
        `ses_configuration_set_name`), `Email__Ses__EventsTopicArn` (output `ses_events_topic_arn`).
 10. [ ] **Webhook.** After the API's `/api/email-events/ses` endpoint is deployed, set the
         `SES_EVENT_WEBHOOK_URL` repository variable to `https://<api-host>/api/email-events/ses`, apply, and check

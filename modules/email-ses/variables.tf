@@ -20,7 +20,7 @@ variable "dmarc_rua" {
 }
 
 variable "dkim_signing_hosted_zone" {
-  description = "SES DKIM signing hosted zone for the region. AWS documents that this varies by region, so it is never assumed; us-east-1 uses dkim.amazonses.com."
+  description = "SES DKIM signing hosted zone for the region. AWS documents that this varies by region, so it is never assumed; us-east-1 and us-east-2 use dkim.amazonses.com."
   type        = string
 }
 

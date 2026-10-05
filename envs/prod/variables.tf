@@ -1,11 +1,11 @@
 variable "aws_region" {
-  description = "AWS region for SES and its supporting resources."
+  description = "AWS region for SES and its supporting resources. The AWS project is pinned to US East (Ohio) and cannot create regional resources anywhere else."
   type        = string
-  default     = "us-east-1"
+  default     = "us-east-2"
 
   validation {
-    condition     = var.aws_region == "us-east-1"
-    error_message = "The DKIM signing zone (dkim.amazonses.com) and the API's Email__Ses__Region assume us-east-1. Update both before changing region."
+    condition     = var.aws_region == "us-east-2"
+    error_message = "The AWS project only allows regional resources in us-east-2, and the API's Email__Ses__Region and the DKIM signing zone (dkim.amazonses.com) assume it. Update all three before changing region."
   }
 }
 

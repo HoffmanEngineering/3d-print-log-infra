@@ -51,7 +51,8 @@ the script logged.
 
 ```bash
 az login && az account set --subscription "<subscription>"
-aws configure   # or export credentials for the target account
+aws login --region us-east-2 --profile printlog   # browser sign-in to the AWS project
+export AWS_PROFILE=printlog AWS_REGION=us-east-2
 gh auth status
 ./bootstrap/bootstrap.sh
 ```
