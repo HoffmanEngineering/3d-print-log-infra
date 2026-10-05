@@ -16,8 +16,9 @@ variable "ses_event_webhook_url" {
 }
 
 variable "alerts_email" {
-  description = "Inbox that receives SES reputation alarms."
+  description = "Inbox that receives SES reputation alarms. Sensitive because plans are posted to public PRs."
   type        = string
+  sensitive   = true
 }
 
 variable "dmarc_rua" {

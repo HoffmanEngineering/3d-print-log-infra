@@ -61,8 +61,9 @@ These cannot be automated, or are deliberately manual. Do them in order.
        claims** workflow and confirm the printed `sub` matches. Re-run it whenever a file under
        `bootstrap/` changes: the CI users' policies and the sender's permissions boundary are applied
        by the script, not by Terraform.
-2. [ ] **Repository variables for Terraform inputs:** `ALERTS_EMAIL` (inbox for SES reputation
-       alarms) and, later, `SES_EVENT_WEBHOOK_URL`. The workflows map them to `TF_VAR_*`.
+2. [ ] **Terraform inputs:** the `ALERTS_EMAIL` *secret* (inbox for SES alarms; a secret because
+       Actions logs and plan comments on this public repo are public) and, later, the
+       `SES_EVENT_WEBHOOK_URL` variable. The workflows map them to `TF_VAR_*`.
 3. [ ] **First apply** (merge to `main`, approve the `production` deployment).
 4. [ ] **Delegate `mail.3dprintlog.com`.** At Namecheap → Advanced DNS, add four `NS` records for host
        `mail`, one per value of the `mail_name_servers` output.

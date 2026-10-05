@@ -31,7 +31,7 @@ jobs:
       ARM_CLIENT_ID: ${{ vars.AZURE_APPLY_CLIENT_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      TF_VAR_alerts_email: ${{ vars.ALERTS_EMAIL }}
+      TF_VAR_alerts_email: ${{ secrets.ALERTS_EMAIL }}
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
       TF_VAR_ses_event_webhook_url: ${{ vars.SES_EVENT_WEBHOOK_URL }}
     steps:
