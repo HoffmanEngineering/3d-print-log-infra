@@ -1,0 +1,157 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SesAccountLevel",
+      "Effect": "Allow",
+      "Action": [
+        "ses:GetAccount",
+        "ses:PutAccountSuppressionAttributes",
+        "ses:ListEmailIdentities",
+        "ses:ListConfigurationSets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SesPrintlogResources",
+      "Effect": "Allow",
+      "Action": ["ses:*"],
+      "Resource": [
+        "arn:aws:ses:*:*:identity/mail.3dprintlog.com",
+        "arn:aws:ses:*:*:configuration-set/printlog-*"
+      ]
+    },
+    {
+      "Sid": "NeverSendMail",
+      "Effect": "Deny",
+      "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:SendBulkEmail",
+        "ses:SendTemplatedEmail",
+        "ses:SendBulkTemplatedEmail",
+        "ses:SendCustomVerificationEmail"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Route53Read",
+      "Effect": "Allow",
+      "Action": [
+        "route53:CreateHostedZone",
+        "route53:GetHostedZone",
+        "route53:ListHostedZones",
+        "route53:ListHostedZonesByName",
+        "route53:ListResourceRecordSets",
+        "route53:GetChange",
+        "route53:ChangeTagsForResource",
+        "route53:ListTagsForResource",
+        "route53:ListTagsForResources",
+        "route53:GetDNSSEC"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Route53MailRecordsOnly",
+      "Effect": "Allow",
+      "Action": ["route53:ChangeResourceRecordSets"],
+      "Resource": "arn:aws:route53:::hostedzone/*",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "mail.3dprintlog.com",
+            "*.mail.3dprintlog.com"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "SnsPrintlogTopics",
+      "Effect": "Allow",
+      "Action": ["sns:*"],
+      "Resource": "arn:aws:sns:*:*:printlog-*"
+    },
+    {
+      "Sid": "SnsList",
+      "Effect": "Allow",
+      "Action": ["sns:ListTopics", "sns:ListSubscriptions", "sns:GetSubscriptionAttributes"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SqsPrintlogQueues",
+      "Effect": "Allow",
+      "Action": ["sqs:*"],
+      "Resource": "arn:aws:sqs:*:*:printlog-*"
+    },
+    {
+      "Sid": "SqsList",
+      "Effect": "Allow",
+      "Action": ["sqs:ListQueues"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchPrintlogAlarms",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:TagResource",
+        "cloudwatch:UntagResource",
+        "cloudwatch:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudwatch:*:*:alarm:printlog-*"
+    },
+    {
+      "Sid": "CloudWatchDescribe",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:DescribeAlarms"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IamPrintlogUsersNoGrant",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetUser",
+        "iam:DeleteUser",
+        "iam:TagUser",
+        "iam:UntagUser",
+        "iam:ListUserTags",
+        "iam:GetUserPolicy",
+        "iam:ListUserPolicies",
+        "iam:ListAttachedUserPolicies",
+        "iam:ListGroupsForUser",
+        "iam:ListAccessKeys"
+      ],
+      "Resource": "arn:aws:iam::*:user/printlog/*"
+    },
+    {
+      "Sid": "IamPrintlogUsersOnlyWithBoundary",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateUser",
+        "iam:PutUserPolicy",
+        "iam:DeleteUserPolicy",
+        "iam:PutUserPermissionsBoundary"
+      ],
+      "Resource": "arn:aws:iam::*:user/printlog/*",
+      "Condition": {
+        "StringLike": {
+          "iam:PermissionsBoundary": "arn:aws:iam::*:policy/printlog/printlog-ses-sender-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "NeverRemoveTheBoundary",
+      "Effect": "Deny",
+      "Action": ["iam:DeleteUserPermissionsBoundary"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Identity",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity"],
+      "Resource": "*"
+    }
+  ]
+}

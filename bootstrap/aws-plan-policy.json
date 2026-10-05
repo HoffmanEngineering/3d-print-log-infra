@@ -1,0 +1,58 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOnlyForManagedServices",
+      "Effect": "Allow",
+      "Action": [
+        "ses:Get*",
+        "ses:List*",
+        "ses:Describe*",
+        "route53:Get*",
+        "route53:List*",
+        "sns:Get*",
+        "sns:List*",
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:ListQueues",
+        "sqs:ListQueueTags",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:ListTagsForResource",
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoRecipientData",
+      "Effect": "Deny",
+      "Action": [
+        "ses:ListSuppressedDestinations",
+        "ses:GetSuppressedDestination",
+        "ses:ListContacts",
+        "ses:GetContact",
+        "ses:GetMessageInsights",
+        "ses:ListExportJobs",
+        "ses:GetExportJob",
+        "ses:ListDomainDeliverabilityCampaigns",
+        "ses:GetDomainDeliverabilityCampaign",
+        "ses:ListDeliverabilityTestReports",
+        "ses:GetDeliverabilityTestReport"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadPrintlogUsers",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetUser",
+        "iam:GetUserPolicy",
+        "iam:ListUserPolicies",
+        "iam:ListUserTags",
+        "iam:ListAttachedUserPolicies",
+        "iam:ListGroupsForUser",
+        "iam:ListAccessKeys"
+      ],
+      "Resource": "arn:aws:iam::*:user/printlog/*"
+    }
+  ]
+}
