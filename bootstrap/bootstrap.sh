@@ -7,6 +7,15 @@
 # account), gh (authenticated). See bootstrap/README.md.
 set -euo pipefail
 
+# Git Bash on Windows rewrites arguments that start with "/" into Windows paths, which mangles the
+# Azure resource ids passed to --scope. No effect anywhere else.
+export MSYS_NO_PATHCONV=1
+
+# The Windows builds of az and aws end lines with CRLF, so every captured value would carry a
+# trailing carriage return (an account name of "name\r" is a Bad Request). Strip it at the source.
+az() { command az "$@" | tr -d '\r'; }
+aws() { command aws "$@" | tr -d '\r'; }
+
 OWNER="HoffmanEngineering"
 REPO="3d-print-log-infra"
 LOCATION="${LOCATION:-centralus}"
