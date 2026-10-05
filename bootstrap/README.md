@@ -61,9 +61,10 @@ repo:HoffmanEngineering@<owner_id>/3d-print-log-infra@<repo_id>:environment:prod
 repo:HoffmanEngineering@<owner_id>/3d-print-log-infra@<repo_id>:pull_request
 ```
 
-The script derives the ids with `gh api`. Before relying on them, run the **OIDC claims** workflow
-(Actions → "OIDC claims" → Run workflow) and check that the printed `sub` matches the apply subject
-the script logged.
+The script derives the ids with `gh api`. A successful PR plan proves them: its Azure login uses the
+same prefix as the apply subject. If an apply ever fails at Azure login, run the **OIDC claims**
+workflow (Actions → "OIDC claims" → Run workflow; it only appears once it is on `main`) and compare
+the printed `sub` with the apply subject the script logged.
 
 ## Running it
 

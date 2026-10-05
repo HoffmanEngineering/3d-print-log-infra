@@ -57,8 +57,8 @@ API's SES access key) is created by hand.
 These cannot be automated, or are deliberately manual. Do them in order.
 
 1. [ ] **Bootstrap.** Run [`bootstrap/bootstrap.sh`](bootstrap/README.md) and store the printed values
-       as repository variables (the AWS keys are stored as secrets automatically). Run the **OIDC
-       claims** workflow and confirm the printed `sub` matches. Re-run it whenever a file under
+       as repository variables (the AWS keys are stored as secrets automatically). A green PR plan
+       confirms the Azure OIDC subjects. Re-run it whenever a file under
        `bootstrap/` changes: the CI users' policies and the sender's permissions boundary are applied
        by the script, not by Terraform.
 2. [ ] **Terraform inputs:** the `ALERTS_EMAIL` *secret* (inbox for SES alarms; a secret because
