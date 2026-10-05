@@ -41,7 +41,6 @@ variable "sender_permissions_boundary_arn" {
 }
 
 variable "alarm_topic_arn" {
-  description = "SNS topic notified when SES events land in the dead-letter queue. Null = no alarm."
+  description = "SNS topic notified when SES events land in the dead-letter queue. Required: the topic's ARN is unknown until apply, so it cannot switch the alarm on and off."
   type        = string
-  default     = null
 }

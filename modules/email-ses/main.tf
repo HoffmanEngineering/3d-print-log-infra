@@ -27,15 +27,16 @@ resource "aws_sesv2_email_identity" "this" {
   }
 }
 
-# The token list is a set, so it is iterated, never indexed.
+# Easy DKIM always issues exactly three tokens. The count is fixed because the tokens themselves are
+# unknown until the identity exists, and for_each over them cannot be planned.
 resource "aws_route53_record" "dkim" {
-  for_each = toset(aws_sesv2_email_identity.this.dkim_signing_attributes[0].tokens)
+  count = 3
 
   zone_id = aws_route53_zone.this.zone_id
-  name    = "${each.value}._domainkey.${var.domain}"
+  name    = "${aws_sesv2_email_identity.this.dkim_signing_attributes[0].tokens[count.index]}._domainkey.${var.domain}"
   type    = "CNAME"
   ttl     = 600
-  records = ["${each.value}.${var.dkim_signing_hosted_zone}"]
+  records = ["${aws_sesv2_email_identity.this.dkim_signing_attributes[0].tokens[count.index]}.${var.dkim_signing_hosted_zone}"]
 }
 
 # --- MAIL FROM (SPF alignment) -----------------------------------------------------------------
@@ -180,8 +181,6 @@ resource "aws_sqs_queue_policy" "events_dlq" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "events_dlq" {
-  count = var.alarm_topic_arn == null ? 0 : 1
-
   alarm_name          = "${var.name}-ses-events-dlq"
   alarm_description   = "SES events could not be delivered to the API webhook and are waiting in the dead-letter queue."
   namespace           = "AWS/SQS"

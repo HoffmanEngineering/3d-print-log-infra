@@ -10,8 +10,8 @@ One SES sending domain, fully described in code:
 - an SNS topic with a policy that lets only SES publish to it, plus an event destination for
   `BOUNCE`, `COMPLAINT`, `DELIVERY` and `REJECT`,
 - an optional HTTPS subscription to the API webhook (`event_webhook_url`), which the API confirms,
-  with an encrypted SQS dead-letter queue for events SNS gives up on, and an alarm on it when
-  `alarm_topic_arn` is set,
+  with an encrypted SQS dead-letter queue for events SNS gives up on, and an alarm on it that
+  notifies `alarm_topic_arn`,
 - the configuration set as the identity's **default**, so a send that omits it still publishes
   events,
 - an IAM user that may call only `ses:SendEmail`, from this identity and configuration set, as
@@ -32,7 +32,7 @@ The hosted zone has `prevent_destroy`, and the apply role cannot delete zones.
 | `event_webhook_url` | API endpoint for SES events; null = no subscription | `null` |
 | `sender_user_name` | IAM user the API sends as | — |
 | `sender_permissions_boundary_arn` | Boundary bootstrap creates for the sender user | — |
-| `alarm_topic_arn` | Topic notified when events reach the DLQ; null = no alarm | `null` |
+| `alarm_topic_arn` | Topic notified when events reach the DLQ | — |
 
 ## Outputs
 
