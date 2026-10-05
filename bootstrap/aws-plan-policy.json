@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOnlyForManagedServices",
+      "Effect": "Allow",
+      "Action": [
+        "ses:Get*",
+        "ses:List*",
+        "ses:Describe*",
+        "route53:Get*",
+        "route53:List*",
+        "sns:Get*",
+        "sns:List*",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:ListTagsForResource",
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadPrintlogUsers",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetUser",
+        "iam:GetUserPolicy",
+        "iam:ListUserPolicies",
+        "iam:ListUserTags",
+        "iam:ListAttachedUserPolicies",
+        "iam:ListGroupsForUser",
+        "iam:ListAccessKeys"
+      ],
+      "Resource": "arn:aws:iam::*:user/printlog/*"
+    }
+  ]
+}

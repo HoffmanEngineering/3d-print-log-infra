@@ -1,0 +1,87 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Ses",
+      "Effect": "Allow",
+      "Action": ["ses:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Route53Zones",
+      "Effect": "Allow",
+      "Action": [
+        "route53:CreateHostedZone",
+        "route53:DeleteHostedZone",
+        "route53:GetHostedZone",
+        "route53:ListHostedZones",
+        "route53:ListHostedZonesByName",
+        "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets",
+        "route53:GetChange",
+        "route53:ChangeTagsForResource",
+        "route53:ListTagsForResource",
+        "route53:ListTagsForResources",
+        "route53:GetDNSSEC"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SnsPrintlogTopics",
+      "Effect": "Allow",
+      "Action": ["sns:*"],
+      "Resource": "arn:aws:sns:*:*:printlog-*"
+    },
+    {
+      "Sid": "SnsList",
+      "Effect": "Allow",
+      "Action": ["sns:ListTopics", "sns:ListSubscriptions", "sns:GetSubscriptionAttributes", "sns:Unsubscribe", "sns:SetSubscriptionAttributes"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchPrintlogAlarms",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:TagResource",
+        "cloudwatch:UntagResource",
+        "cloudwatch:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudwatch:*:*:alarm:printlog-*"
+    },
+    {
+      "Sid": "CloudWatchDescribe",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:DescribeAlarms"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IamPrintlogUsers",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateUser",
+        "iam:DeleteUser",
+        "iam:GetUser",
+        "iam:TagUser",
+        "iam:UntagUser",
+        "iam:ListUserTags",
+        "iam:PutUserPolicy",
+        "iam:GetUserPolicy",
+        "iam:DeleteUserPolicy",
+        "iam:ListUserPolicies",
+        "iam:ListAttachedUserPolicies",
+        "iam:ListGroupsForUser",
+        "iam:ListAccessKeys"
+      ],
+      "Resource": "arn:aws:iam::*:user/printlog/*"
+    },
+    {
+      "Sid": "Identity",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity"],
+      "Resource": "*"
+    }
+  ]
+}
