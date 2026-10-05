@@ -1,0 +1,17 @@
+version: 2
+
+updates:
+  # Provider versions are pinned in the lock file; this keeps them moving deliberately, one PR at a time.
+  - package-ecosystem: terraform
+    directory: "/envs/prod"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # The apply workflow assumes cloud roles via OIDC, so a stale or compromised action runs with
+  # production infrastructure rights.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
