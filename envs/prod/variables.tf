@@ -2,6 +2,11 @@ variable "aws_region" {
   description = "AWS region for SES and its supporting resources."
   type        = string
   default     = "us-east-1"
+
+  validation {
+    condition     = var.aws_region == "us-east-1"
+    error_message = "The DKIM signing zone (dkim.amazonses.com) and the API's Email__Ses__Region assume us-east-1. Update both before changing region."
+  }
 }
 
 variable "ses_event_webhook_url" {

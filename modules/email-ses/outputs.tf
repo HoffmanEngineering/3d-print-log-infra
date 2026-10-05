@@ -32,3 +32,8 @@ output "sender_user_name" {
   description = "IAM user whose access key the API uses."
   value       = aws_iam_user.sender.name
 }
+
+output "events_dlq_url" {
+  description = "Dead-letter queue holding SES events SNS could not deliver to the webhook."
+  value       = aws_sqs_queue.events_dlq.id
+}

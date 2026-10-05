@@ -34,3 +34,14 @@ variable "sender_user_name" {
   description = "Name of the IAM user the API sends as. Its access key is created by hand so the secret never enters state."
   type        = string
 }
+
+variable "sender_permissions_boundary_arn" {
+  description = "ARN of the permissions boundary bootstrap creates for the sender user. The apply role may only create or change /printlog/ users that carry it."
+  type        = string
+}
+
+variable "alarm_topic_arn" {
+  description = "SNS topic notified when SES events land in the dead-letter queue. Null = no alarm."
+  type        = string
+  default     = null
+}

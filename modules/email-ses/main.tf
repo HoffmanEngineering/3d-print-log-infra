@@ -5,14 +5,22 @@ locals {
   mail_from_domain = "${var.mail_from_subdomain}.${var.domain}"
 }
 
+# The apply role cannot delete hosted zones, so destroying this one is a deliberate manual act.
 resource "aws_route53_zone" "this" {
   name = var.domain
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # --- Identity and DKIM -------------------------------------------------------------------------
 
+# The default configuration set means a send that omits one still publishes events, so a leaked
+# key cannot send mail the webhook never hears about.
 resource "aws_sesv2_email_identity" "this" {
-  email_identity = var.domain
+  email_identity         = var.domain
+  configuration_set_name = aws_sesv2_configuration_set.this.configuration_set_name
 
   dkim_signing_attributes {
     next_signing_key_length = "RSA_2048_BIT"
@@ -139,6 +147,55 @@ resource "aws_sesv2_configuration_set_event_destination" "sns" {
   depends_on = [aws_sns_topic_policy.events]
 }
 
+# SNS retries an HTTPS endpoint for about an hour and treats most 4xx responses as permanent, then
+# discards the message. The dead-letter queue keeps those events for replay (see README).
+resource "aws_sqs_queue" "events_dlq" {
+  name                      = "${var.name}-ses-events-dlq"
+  message_retention_seconds = 1209600
+  sqs_managed_sse_enabled   = true
+}
+
+data "aws_iam_policy_document" "events_dlq" {
+  statement {
+    sid       = "AllowSnsDeadLetter"
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.events_dlq.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_sns_topic.events.arn]
+    }
+  }
+}
+
+resource "aws_sqs_queue_policy" "events_dlq" {
+  queue_url = aws_sqs_queue.events_dlq.id
+  policy    = data.aws_iam_policy_document.events_dlq.json
+}
+
+resource "aws_cloudwatch_metric_alarm" "events_dlq" {
+  count = var.alarm_topic_arn == null ? 0 : 1
+
+  alarm_name          = "${var.name}-ses-events-dlq"
+  alarm_description   = "SES events could not be delivered to the API webhook and are waiting in the dead-letter queue."
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  dimensions          = { QueueName = aws_sqs_queue.events_dlq.name }
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [var.alarm_topic_arn]
+}
+
 # The API confirms the subscription itself, after verifying the SNS signature.
 # Empty is treated like null because CI passes an unset repository variable as "".
 resource "aws_sns_topic_subscription" "webhook" {
@@ -149,19 +206,25 @@ resource "aws_sns_topic_subscription" "webhook" {
   endpoint                        = var.event_webhook_url
   endpoint_auto_confirms          = false
   confirmation_timeout_in_minutes = 5
+  redrive_policy                  = jsonencode({ deadLetterTargetArn = aws_sqs_queue.events_dlq.arn })
+
+  depends_on = [aws_sqs_queue_policy.events_dlq]
 }
 
 # --- Sender identity for the API ----------------------------------------------------------------
 
+# The boundary is created by bootstrap, outside Terraform, so the apply role can never widen what
+# this user's key is able to do — even by rewriting the inline policy below.
 resource "aws_iam_user" "sender" {
-  name = var.sender_user_name
-  path = "/printlog/"
+  name                 = var.sender_user_name
+  path                 = "/printlog/"
+  permissions_boundary = var.sender_permissions_boundary_arn
 }
 
 data "aws_iam_policy_document" "sender" {
   statement {
     sid     = "SendFromThisDomainOnly"
-    actions = ["ses:SendEmail", "ses:SendRawEmail"]
+    actions = ["ses:SendEmail"]
     resources = [
       aws_sesv2_email_identity.this.arn,
       aws_sesv2_configuration_set.this.arn,

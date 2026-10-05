@@ -17,3 +17,8 @@ output "ses_sender_user_name" {
   description = "Create the API's access key for this user by hand (see README)."
   value       = module.email_mail.sender_user_name
 }
+
+output "ses_events_dlq_url" {
+  description = "Dead-letter queue for SES events the webhook did not accept (see modules/email-ses README)."
+  value       = module.email_mail.events_dlq_url
+}
