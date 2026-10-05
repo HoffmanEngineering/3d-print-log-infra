@@ -1,8 +1,8 @@
 name: OIDC claims
 
 # Prints the claims GitHub puts in this repository's OIDC token for the production environment, so
-# the trust subjects created by bootstrap/bootstrap.sh can be checked against what GitHub actually
-# emits. Never prints the token itself.
+# the Azure federated-credential subjects created by bootstrap/bootstrap.sh can be checked against
+# what GitHub actually emits. Never prints the token itself.
 on:
   workflow_dispatch:
 

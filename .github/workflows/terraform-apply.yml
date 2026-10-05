@@ -48,9 +48,12 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # The AWS project denies IAM identity providers, so AWS uses an IAM user's key (stored by
+      # bootstrap/bootstrap.sh) rather than GitHub's OIDC token. Azure still uses OIDC.
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_APPLY_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_APPLY_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: terraform init

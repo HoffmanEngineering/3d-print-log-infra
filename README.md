@@ -15,9 +15,11 @@ that AWS manages inside its own organization. Two things follow from that:
 
 - **Region is fixed at `us-east-2` (Ohio).** AWS's managed service control policies deny regional
   resources anywhere else, so `aws_region` is pinned by validation.
+- **No IAM identity providers.** GitHub's OIDC token can't be trusted, so CI uses IAM user keys
+  stored as GitHub secrets (see bootstrap).
 - **Human access is `aws login`, not IAM users or Identity Center.** Use the `printlog` profile
-  (`aws login --region us-east-2 --profile printlog`). The only IAM user is the API's SES sender,
-  which is programmatic-only.
+  (`aws login --region us-east-2 --profile printlog`). The IAM users (the API's SES sender and
+  the two CI users) are programmatic-only.
 
 A spend limit can be set per project in AWS Settings. If it is ever exceeded, AWS pauses the project
 and SES stops sending until it is raised.
@@ -25,7 +27,7 @@ and SES stops sending until it is raised.
 ## Layout
 
 ```
-bootstrap/          one-time script: Terraform state storage + GitHub OIDC trust (run by hand)
+bootstrap/          one-time script: Terraform state storage + CI credentials (run by hand)
 modules/
   email-ses/        an SES sending domain: zone, DKIM, MAIL FROM, DMARC, events, sender user
 envs/
@@ -40,8 +42,11 @@ envs/
   cloud credentials.
 - **Merge to `main`:** `terraform apply` runs behind the `production` environment's required
   reviewer. Applies never run concurrently.
-- State is in Azure Storage (`tfstate` container), authenticated with Entra ID. There are no
-  storage keys and no cloud keys in GitHub: both clouds trust GitHub's OIDC tokens.
+- State is in Azure Storage (`tfstate` container), authenticated with Entra ID. Azure trusts
+  GitHub's OIDC tokens, so there are no Azure keys anywhere. AWS can't: the project denies IAM
+  identity providers. CI therefore uses two IAM users whose keys bootstrap stores as GitHub
+  secrets: a read-only plan key (repository secret) and the apply key (`production` environment
+  secret, readable only by the approved apply job on `main`).
 
 **This repository is public.** Never commit `*.tfvars` with real values, plan files, or anything
 secret. Nothing in Terraform state is secret by design: the one credential this stack needs (the
@@ -52,9 +57,10 @@ API's SES access key) is created by hand.
 These cannot be automated, or are deliberately manual. Do them in order.
 
 1. [ ] **Bootstrap.** Run [`bootstrap/bootstrap.sh`](bootstrap/README.md) and store the printed values
-       as repository variables. Run the **OIDC claims** workflow and confirm the printed `sub` matches.
-       Re-run it whenever a file under `bootstrap/` changes: the role policies and the sender's
-       permissions boundary are applied by the script, not by Terraform.
+       as repository variables (the AWS keys are stored as secrets automatically). Run the **OIDC
+       claims** workflow and confirm the printed `sub` matches. Re-run it whenever a file under
+       `bootstrap/` changes: the CI users' policies and the sender's permissions boundary are applied
+       by the script, not by Terraform.
 2. [ ] **Repository variables for Terraform inputs:** `ALERTS_EMAIL` (inbox for SES reputation
        alarms) and, later, `SES_EVENT_WEBHOOK_URL`. The workflows map them to `TF_VAR_*`.
 3. [ ] **First apply** (merge to `main`, approve the `production` deployment).

@@ -22,18 +22,36 @@ anything. `bootstrap.sh` creates exactly those things, once, by hand. Everything
 
 **AWS** (the account your `aws` credentials point at):
 
-- the IAM OIDC provider for `token.actions.githubusercontent.com`
-- role `printlog-infra-apply` (production environment) with `aws-apply-policy.json`: SES actions
+The AWS project's managed policies deny every IAM identity provider, so GitHub's OIDC token can't be
+trusted on the AWS side. CI uses two IAM users instead. Each user's access key goes straight from
+`aws iam create-access-key` into a GitHub secret: it is never printed, logged or written to state.
+
+- user `/ci/printlog-infra-apply` with `aws-apply-policy.json`, key in the **`production`
+  environment** secrets `AWS_APPLY_ACCESS_KEY_ID` / `AWS_APPLY_SECRET_ACCESS_KEY` (only the
+  approved apply job on `main` can read them). SES actions
   only on the `mail.3dprintlog.com` identity and `printlog-*` configuration sets (and never a send),
   Route 53 record changes only under `mail.3dprintlog.com`, no hosted-zone deletion, and IAM writes
   only to `/printlog/` users that carry the sender boundary
-- role `printlog-infra-plan` (pull requests) with the read-only `aws-plan-policy.json`, which is
-  explicitly denied SES reads that return recipient addresses (suppression list, contacts)
+- user `/ci/printlog-infra-plan` with the read-only `aws-plan-policy.json`, which is explicitly
+  denied SES reads that return recipient addresses (suppression list, contacts). Key in the
+  repository secrets `AWS_PLAN_ACCESS_KEY_ID` / `AWS_PLAN_SECRET_ACCESS_KEY`, which GitHub never
+  gives to fork PRs.
+- Both users live under `/ci/`, outside the `/printlog/` path the apply policy may modify, so
+  neither can change its own permissions.
 - managed policy `/printlog/printlog-ses-sender-boundary` (`aws-sender-boundary.json`): the
   permissions boundary on the API's sender user, allowing nothing but `ses:SendEmail`. It lives
-  outside Terraform so the apply role cannot widen it.
+  outside Terraform so the apply user cannot widen it.
 
-## OIDC subjects
+## Rotating the CI keys
+
+```bash
+ROTATE_AWS_KEYS=1 ./bootstrap/bootstrap.sh
+```
+
+This creates a new key for each CI user, stores it in GitHub, then deletes the old one. Rotate if a
+key may have leaked, and otherwise about once a year.
+
+## OIDC subjects (Azure)
 
 This repository was created after 2026-07-15, so GitHub issues **immutable** subject claims that
 include the owner and repository ids:
@@ -61,6 +79,6 @@ Then set each printed value as a repository variable (`gh variable set NAME --bo
 
 ## Undo
 
-Delete the two Entra apps, the resource group, the two IAM roles, the sender boundary policy and the
-OIDC provider. Do this only
+Delete the two Entra apps, the resource group, the two `/ci/` IAM users (and their keys), the sender
+boundary policy, and the four `AWS_*` GitHub secrets. Do this only
 after `terraform destroy`, or the state describing live resources is lost.

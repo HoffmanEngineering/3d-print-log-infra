@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One-time bootstrap for 3d-print-log-infra. Creates the two things Terraform cannot create for
-# itself: somewhere to keep its state, and the OIDC trust that lets GitHub Actions run it without
-# stored cloud keys. Safe to re-run: every create is preceded by an existence check.
+# itself: somewhere to keep its state, and the credentials GitHub Actions runs it with (OIDC trust
+# for Azure; IAM users whose keys go straight into GitHub secrets for AWS). Safe to re-run: every
+# create is preceded by an existence check. ROTATE_AWS_KEYS=1 replaces both AWS keys.
 #
 # Requires: az (logged in, correct subscription selected), aws (credentials for the target
 # account), gh (authenticated). See bootstrap/README.md.
@@ -23,10 +24,9 @@ TFSTATE_RG="${TFSTATE_RG:-rg-printlog-tfstate}"
 TFSTATE_CONTAINER="tfstate"
 APPLY_APP_NAME="github-${REPO}-apply"
 PLAN_APP_NAME="github-${REPO}-plan"
-AWS_APPLY_ROLE="printlog-infra-apply"
-AWS_PLAN_ROLE="printlog-infra-plan"
 GITHUB_OIDC_HOST="token.actions.githubusercontent.com"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# A Windows path (D:/...) under Git Bash, which the Windows aws CLI can read in file:// arguments.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && { pwd -W 2>/dev/null || pwd; })"
 
 # Progress goes to stderr so it never pollutes values captured with $(...).
 log() { printf '==> %s\n' "$*" >&2; }
@@ -144,74 +144,88 @@ AZURE_APPLY_CLIENT_ID="$(ensure_azure_principal "$APPLY_APP_NAME" "$APPLY_SUBJEC
 # with -lock=false because a reader cannot take a blob lease.
 AZURE_PLAN_CLIENT_ID="$(ensure_azure_principal "$PLAN_APP_NAME" "$PLAN_SUBJECT" pull-request "Storage Blob Data Reader")"
 
-# --- AWS: OIDC provider and roles -------------------------------------------------------------
+# --- AWS: CI users ------------------------------------------------------------------------------
+# The AWS account is a project from AWS's newer sign-up experience, whose managed policies deny every
+# IAM identity provider, so GitHub's OIDC token cannot be trusted here. CI uses two IAM users with
+# access keys instead. Each key goes straight from IAM into a GitHub secret: it is never printed,
+# logged or written to Terraform state. The apply key is a `production` environment secret, so only
+# the approved apply job on main can read it. The users live under /ci/, outside the /printlog/ path
+# the apply policy may modify, so neither can change its own permissions.
 AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 AWS_REGION="${AWS_REGION:-us-east-2}"
-OIDC_PROVIDER_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${GITHUB_OIDC_HOST}"
 
-if ! aws iam get-open-id-connect-provider --open-id-connect-provider-arn "$OIDC_PROVIDER_ARN" >/dev/null 2>&1; then
-  log "creating the GitHub OIDC provider in AWS"
-  aws iam create-open-id-connect-provider \
-    --url "https://${GITHUB_OIDC_HOST}" \
-    --client-id-list sts.amazonaws.com >/dev/null
-fi
-
-ensure_aws_role() {
-  local role_name=$1 subject=$2 policy_file=$3
-  local trust
-  trust="$(cat <<JSON
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Federated": "${OIDC_PROVIDER_ARN}" },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "${GITHUB_OIDC_HOST}:aud": "sts.amazonaws.com",
-        "${GITHUB_OIDC_HOST}:sub": "${subject}"
-      }
-    }
-  }]
-}
-JSON
-)"
-
-  if aws iam get-role --role-name "$role_name" >/dev/null 2>&1; then
-    aws iam update-assume-role-policy --role-name "$role_name" --policy-document "$trust" >/dev/null
+# Usage: ensure_managed_policy <name> <path> <policy file>; prints the ARN. Customer-managed rather
+# than inline, because inline user policies are capped at 2048 characters and the apply policy is
+# larger. Re-running replaces the document with the file's current contents.
+ensure_managed_policy() {
+  local name=$1 path=$2 file=$3
+  local arn="arn:aws:iam::${AWS_ACCOUNT_ID}:policy${path}${name}"
+  if aws iam get-policy --policy-arn "$arn" >/dev/null 2>&1; then
+    for version in $(aws iam list-policy-versions --policy-arn "$arn" \
+      --query 'Versions[?!IsDefaultVersion].VersionId' --output text); do
+      aws iam delete-policy-version --policy-arn "$arn" --version-id "$version"
+    done
+    aws iam create-policy-version --policy-arn "$arn" --set-as-default \
+      --policy-document "file://${file}" >/dev/null
   else
-    log "creating IAM role ${role_name}"
-    aws iam create-role --role-name "$role_name" --assume-role-policy-document "$trust" \
+    log "creating managed policy ${path}${name}"
+    aws iam create-policy --policy-name "$name" --path "$path" --policy-document "file://${file}" \
       --tags Key=project,Value=3d-print-log Key=managed-by,Value=bootstrap >/dev/null
   fi
-
-  aws iam put-role-policy --role-name "$role_name" --policy-name "${role_name}-permissions" \
-    --policy-document "file://${policy_file}" >/dev/null
-
-  aws iam get-role --role-name "$role_name" --query Role.Arn --output text
+  printf '%s' "$arn"
 }
 
-# The sender user's permissions boundary lives outside Terraform on purpose: the apply role may only
+# The sender user's permissions boundary lives outside Terraform on purpose: the apply user may only
 # create or change /printlog/ users that carry it, and cannot edit it.
-SENDER_BOUNDARY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/printlog/printlog-ses-sender-boundary"
-if aws iam get-policy --policy-arn "$SENDER_BOUNDARY_ARN" >/dev/null 2>&1; then
-  for version in $(aws iam list-policy-versions --policy-arn "$SENDER_BOUNDARY_ARN"     --query 'Versions[?!IsDefaultVersion].VersionId' --output text); do
-    aws iam delete-policy-version --policy-arn "$SENDER_BOUNDARY_ARN" --version-id "$version"
-  done
-  aws iam create-policy-version --policy-arn "$SENDER_BOUNDARY_ARN" --set-as-default     --policy-document "file://${SCRIPT_DIR}/aws-sender-boundary.json" >/dev/null
-else
-  log "creating the SES sender permissions boundary"
-  aws iam create-policy --policy-name printlog-ses-sender-boundary --path /printlog/     --policy-document "file://${SCRIPT_DIR}/aws-sender-boundary.json"     --tags Key=project,Value=3d-print-log Key=managed-by,Value=bootstrap >/dev/null
-fi
+ensure_managed_policy printlog-ses-sender-boundary /printlog/ "${SCRIPT_DIR}/aws-sender-boundary.json" >/dev/null
 
-AWS_APPLY_ROLE_ARN="$(ensure_aws_role "$AWS_APPLY_ROLE" "$APPLY_SUBJECT" "${SCRIPT_DIR}/aws-apply-policy.json")"
-AWS_PLAN_ROLE_ARN="$(ensure_aws_role "$AWS_PLAN_ROLE" "$PLAN_SUBJECT" "${SCRIPT_DIR}/aws-plan-policy.json")"
+# Usage: ensure_aws_ci_user <user> <policy file> <secret prefix> [gh secret scope args...]
+# Creates a key only when the user has none, or when ROTATE_AWS_KEYS=1 (then the old keys are
+# deleted once the new one is stored).
+ensure_aws_ci_user() {
+  local user=$1 policy_file=$2 prefix=$3
+  shift 3
+  local existing key id secret
+
+  if ! aws iam get-user --user-name "$user" >/dev/null 2>&1; then
+    log "creating IAM user ${user}"
+    aws iam create-user --user-name "$user" --path /ci/ \
+      --tags Key=project,Value=3d-print-log Key=managed-by,Value=bootstrap >/dev/null
+  fi
+  aws iam attach-user-policy --user-name "$user" \
+    --policy-arn "$(ensure_managed_policy "${user}-permissions" /ci/ "$policy_file")"
+
+  existing="$(aws iam list-access-keys --user-name "$user" --query 'AccessKeyMetadata[].AccessKeyId' --output text)"
+  if [ -n "$existing" ] && [ "${ROTATE_AWS_KEYS:-0}" != "1" ]; then
+    return
+  fi
+
+  log "creating an access key for ${user} and storing it as ${prefix}_* GitHub secrets"
+  key="$(aws iam create-access-key --user-name "$user" --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text)"
+  id="${key%%$'\t'*}"
+  secret="${key#*$'\t'}"
+  # Through stdin, so the secret never appears in a process list.
+  if ! { printf '%s' "$id" | gh secret set "${prefix}_ACCESS_KEY_ID" --repo "${OWNER}/${REPO}" "$@" \
+    && printf '%s' "$secret" | gh secret set "${prefix}_SECRET_ACCESS_KEY" --repo "${OWNER}/${REPO}" "$@"; }; then
+    aws iam delete-access-key --user-name "$user" --access-key-id "$id"
+    echo "could not store the ${user} key in GitHub; the new key was deleted." >&2
+    exit 1
+  fi
+
+  for old in $existing; do
+    log "deleting the previous key for ${user}"
+    aws iam delete-access-key --user-name "$user" --access-key-id "$old"
+  done
+}
+
+ensure_aws_ci_user printlog-infra-apply "${SCRIPT_DIR}/aws-apply-policy.json" AWS_APPLY --env production
+ensure_aws_ci_user printlog-infra-plan "${SCRIPT_DIR}/aws-plan-policy.json" AWS_PLAN
 
 # --- Output -------------------------------------------------------------------------------------
 cat <<OUT
 
-Bootstrap complete. Store these as GitHub Actions *variables* on ${OWNER}/${REPO}
-(none of them are secrets):
+Bootstrap complete. The AWS keys are already stored as GitHub secrets. Store these as GitHub
+Actions *variables* on ${OWNER}/${REPO} (none of them are secrets):
 
   AZURE_APPLY_CLIENT_ID=${AZURE_APPLY_CLIENT_ID}
   AZURE_PLAN_CLIENT_ID=${AZURE_PLAN_CLIENT_ID}
@@ -219,8 +233,6 @@ Bootstrap complete. Store these as GitHub Actions *variables* on ${OWNER}/${REPO
   AZURE_SUBSCRIPTION_ID=${SUBSCRIPTION_ID}
   TFSTATE_RESOURCE_GROUP=${TFSTATE_RG}
   TFSTATE_STORAGE_ACCOUNT=${TFSTATE_STORAGE_ACCOUNT}
-  AWS_APPLY_ROLE_ARN=${AWS_APPLY_ROLE_ARN}
-  AWS_PLAN_ROLE_ARN=${AWS_PLAN_ROLE_ARN}
   AWS_REGION=${AWS_REGION}
 
 For example:
