@@ -46,21 +46,25 @@ if [ "$(az group exists --name "$TFSTATE_RG")" != "true" ]; then
   az group create --name "$TFSTATE_RG" --location "$LOCATION" --tags project=3d-print-log managed-by=bootstrap >/dev/null
 fi
 
-TFSTATE_STORAGE_ACCOUNT="${TFSTATE_STORAGE_ACCOUNT:-$(az storage account list --resource-group "$TFSTATE_RG" --query '[0].name' -o tsv)}"
-if [ -z "$TFSTATE_STORAGE_ACCOUNT" ]; then
-  TFSTATE_STORAGE_ACCOUNT="stprintlogtfstate$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"
-  log "creating storage account ${TFSTATE_STORAGE_ACCOUNT}"
-  az storage account create \
-    --name "$TFSTATE_STORAGE_ACCOUNT" \
-    --resource-group "$TFSTATE_RG" \
-    --location "$LOCATION" \
-    --sku Standard_LRS \
-    --kind StorageV2 \
-    --min-tls-version TLS1_2 \
-    --allow-blob-public-access false \
-    --allow-shared-key-access false \
-    --tags project=3d-print-log managed-by=bootstrap >/dev/null
+# Never guess between several accounts: an existing one is picked up only if it is the only one.
+if [ -z "${TFSTATE_STORAGE_ACCOUNT:-}" ]; then
+  mapfile -t EXISTING_ACCOUNTS < <(az storage account list --resource-group "$TFSTATE_RG" --query '[].name' -o tsv)
+  if [ "${#EXISTING_ACCOUNTS[@]}" -gt 1 ]; then
+    echo "${TFSTATE_RG} holds ${#EXISTING_ACCOUNTS[@]} storage accounts; set TFSTATE_STORAGE_ACCOUNT to choose one." >&2
+    exit 1
+  fi
+  TFSTATE_STORAGE_ACCOUNT="${EXISTING_ACCOUNTS[0]:-}"
 fi
+if [ -z "$TFSTATE_STORAGE_ACCOUNT" ]; then
+  TFSTATE_STORAGE_ACCOUNT="stprintlogtfstate$(od -An -N2 -tx1 /dev/urandom | tr -d ' 
+')"
+  log "creating storage account ${TFSTATE_STORAGE_ACCOUNT}"
+  az storage account create     --name "$TFSTATE_STORAGE_ACCOUNT"     --resource-group "$TFSTATE_RG"     --location "$LOCATION"     --sku Standard_LRS     --kind StorageV2     --min-tls-version TLS1_2     --allow-blob-public-access false     --allow-shared-key-access false     --tags project=3d-print-log managed-by=bootstrap >/dev/null
+fi
+
+# Re-applied on every run, so an account that pre-dates this script or has drifted is brought back.
+log "enforcing TLS 1.2, no shared keys and no public blobs on ${TFSTATE_STORAGE_ACCOUNT}"
+az storage account update   --name "$TFSTATE_STORAGE_ACCOUNT"   --resource-group "$TFSTATE_RG"   --min-tls-version TLS1_2   --allow-blob-public-access false   --allow-shared-key-access false >/dev/null
 STORAGE_ID="$(az storage account show --name "$TFSTATE_STORAGE_ACCOUNT" --resource-group "$TFSTATE_RG" --query id -o tsv)"
 
 log "enabling blob versioning and soft delete"
@@ -84,6 +88,10 @@ fi
 if [ "$(az storage container exists --name "$TFSTATE_CONTAINER" --account-name "$TFSTATE_STORAGE_ACCOUNT" --auth-mode login --query exists -o tsv)" != "true" ]; then
   log "creating container ${TFSTATE_CONTAINER}"
   az storage container create --name "$TFSTATE_CONTAINER" --account-name "$TFSTATE_STORAGE_ACCOUNT" --auth-mode login >/dev/null
+fi
+if [ "$(az storage container show --name "$TFSTATE_CONTAINER" --account-name "$TFSTATE_STORAGE_ACCOUNT" --auth-mode login --query properties.publicAccess -o tsv)" != "" ]; then
+  echo "container ${TFSTATE_CONTAINER} allows public access; fix it before continuing." >&2
+  exit 1
 fi
 CONTAINER_SCOPE="${STORAGE_ID}/blobServices/default/containers/${TFSTATE_CONTAINER}"
 
@@ -173,6 +181,19 @@ JSON
 
   aws iam get-role --role-name "$role_name" --query Role.Arn --output text
 }
+
+# The sender user's permissions boundary lives outside Terraform on purpose: the apply role may only
+# create or change /printlog/ users that carry it, and cannot edit it.
+SENDER_BOUNDARY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/printlog/printlog-ses-sender-boundary"
+if aws iam get-policy --policy-arn "$SENDER_BOUNDARY_ARN" >/dev/null 2>&1; then
+  for version in $(aws iam list-policy-versions --policy-arn "$SENDER_BOUNDARY_ARN"     --query 'Versions[?!IsDefaultVersion].VersionId' --output text); do
+    aws iam delete-policy-version --policy-arn "$SENDER_BOUNDARY_ARN" --version-id "$version"
+  done
+  aws iam create-policy-version --policy-arn "$SENDER_BOUNDARY_ARN" --set-as-default     --policy-document "file://${SCRIPT_DIR}/aws-sender-boundary.json" >/dev/null
+else
+  log "creating the SES sender permissions boundary"
+  aws iam create-policy --policy-name printlog-ses-sender-boundary --path /printlog/     --policy-document "file://${SCRIPT_DIR}/aws-sender-boundary.json"     --tags Key=project,Value=3d-print-log Key=managed-by,Value=bootstrap >/dev/null
+fi
 
 AWS_APPLY_ROLE_ARN="$(ensure_aws_role "$AWS_APPLY_ROLE" "$APPLY_SUBJECT" "${SCRIPT_DIR}/aws-apply-policy.json")"
 AWS_PLAN_ROLE_ARN="$(ensure_aws_role "$AWS_PLAN_ROLE" "$PLAN_SUBJECT" "${SCRIPT_DIR}/aws-plan-policy.json")"

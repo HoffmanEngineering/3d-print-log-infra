@@ -39,6 +39,8 @@ These cannot be automated, or are deliberately manual. Do them in order.
 
 1. [ ] **Bootstrap.** Run [`bootstrap/bootstrap.sh`](bootstrap/README.md) and store the printed values
        as repository variables. Run the **OIDC claims** workflow and confirm the printed `sub` matches.
+       Re-run it whenever a file under `bootstrap/` changes: the role policies and the sender's
+       permissions boundary are applied by the script, not by Terraform.
 2. [ ] **Repository variables for Terraform inputs:** `ALERTS_EMAIL` (inbox for SES reputation
        alarms) and, later, `SES_EVENT_WEBHOOK_URL`. The workflows map them to `TF_VAR_*`.
 3. [ ] **First apply** (merge to `main`, approve the `production` deployment).
@@ -58,7 +60,8 @@ These cannot be automated, or are deliberately manual. Do them in order.
 
        `MARKETING` is declared because these are scheduled engagement emails, not one-to-one
        transactional mail triggered by a user action.
-8. [ ] **Confirm the alerts subscription** from the `alerts_email` inbox.
+8. [ ] **Confirm the alerts subscription** from the `alerts_email` inbox. It receives the reputation
+       alarms and the dead-letter alarm for SES events.
 9. [ ] **API credentials.** Create the key by hand and put it in App Service settings, so the secret
        never enters Terraform state:
 
@@ -66,7 +69,8 @@ These cannot be automated, or are deliberately manual. Do them in order.
        aws iam create-access-key --user-name printlog-api-ses-sender
        ```
 
-       App Service settings: `Email__Ses__AccessKeyId`, `Email__Ses__SecretAccessKey`,
+       App Service settings: `Email__Ses__AccessKeyId`, `Email__Ses__SecretAccessKey` (ideally as a
+       Key Vault reference, so the secret is not readable by anyone with App Service config access),
        `Email__Ses__Region=us-east-1`, `Email__Ses__ConfigurationSet` (output
        `ses_configuration_set_name`), `Email__Ses__EventsTopicArn` (output `ses_events_topic_arn`).
 10. [ ] **Webhook.** After the API's `/api/email-events/ses` endpoint is deployed, set the
