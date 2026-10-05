@@ -1,0 +1,26 @@
+name: OIDC claims
+
+# Prints the claims GitHub puts in this repository's OIDC token for the production environment, so
+# the trust subjects created by bootstrap/bootstrap.sh can be checked against what GitHub actually
+# emits. Never prints the token itself.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  claims:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+            for (const key of ['sub', 'aud', 'iss', 'repository', 'repository_owner_id', 'repository_id', 'environment', 'ref']) {
+              core.info(`${key}: ${payload[key]}`);
+            }

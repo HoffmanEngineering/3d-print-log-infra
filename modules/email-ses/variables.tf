@@ -25,7 +25,7 @@ variable "dkim_signing_hosted_zone" {
 }
 
 variable "event_webhook_url" {
-  description = "HTTPS endpoint that receives SES events from SNS. When null, no subscription is created."
+  description = "HTTPS endpoint that receives SES events from SNS. When null or empty, no subscription is created."
   type        = string
   default     = null
 }

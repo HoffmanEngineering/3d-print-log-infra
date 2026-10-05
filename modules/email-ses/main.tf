@@ -140,8 +140,9 @@ resource "aws_sesv2_configuration_set_event_destination" "sns" {
 }
 
 # The API confirms the subscription itself, after verifying the SNS signature.
+# Empty is treated like null because CI passes an unset repository variable as "".
 resource "aws_sns_topic_subscription" "webhook" {
-  count = var.event_webhook_url == null ? 0 : 1
+  count = var.event_webhook_url == null || var.event_webhook_url == "" ? 0 : 1
 
   topic_arn                       = aws_sns_topic.events.arn
   protocol                        = "https"

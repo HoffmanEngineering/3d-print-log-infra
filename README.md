@@ -39,8 +39,8 @@ These cannot be automated, or are deliberately manual. Do them in order.
 
 1. [ ] **Bootstrap.** Run [`bootstrap/bootstrap.sh`](bootstrap/README.md) and store the printed values
        as repository variables. Run the **OIDC claims** workflow and confirm the printed `sub` matches.
-2. [ ] **Repository variables for Terraform inputs:** `TF_VAR_ALERTS_EMAIL` (inbox for SES reputation
-       alarms) and, later, `TF_VAR_SES_EVENT_WEBHOOK_URL`.
+2. [ ] **Repository variables for Terraform inputs:** `ALERTS_EMAIL` (inbox for SES reputation
+       alarms) and, later, `SES_EVENT_WEBHOOK_URL`. The workflows map them to `TF_VAR_*`.
 3. [ ] **First apply** (merge to `main`, approve the `production` deployment).
 4. [ ] **Delegate `mail.3dprintlog.com`.** At Namecheap → Advanced DNS, add four `NS` records for host
        `mail`, one per value of the `mail_name_servers` output.
@@ -69,8 +69,8 @@ These cannot be automated, or are deliberately manual. Do them in order.
        App Service settings: `Email__Ses__AccessKeyId`, `Email__Ses__SecretAccessKey`,
        `Email__Ses__Region=us-east-1`, `Email__Ses__ConfigurationSet` (output
        `ses_configuration_set_name`), `Email__Ses__EventsTopicArn` (output `ses_events_topic_arn`).
-10. [ ] **Webhook.** After the API's `/api/email-events/ses` endpoint is deployed, set
-        `TF_VAR_SES_EVENT_WEBHOOK_URL` to `https://<api-host>/api/email-events/ses`, apply, and check
+10. [ ] **Webhook.** After the API's `/api/email-events/ses` endpoint is deployed, set the
+        `SES_EVENT_WEBHOOK_URL` repository variable to `https://<api-host>/api/email-events/ses`, apply, and check
         the subscription shows `Confirmed` (`aws sns list-subscriptions-by-topic`).
 11. [ ] **App Service "Always On"** must be enabled on the API: its email workers run in-process.
 
