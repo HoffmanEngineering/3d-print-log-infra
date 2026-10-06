@@ -98,6 +98,14 @@ These cannot be automated, or are deliberately manual. Do them in order.
         `SES_EVENT_WEBHOOK_URL` repository variable to `https://<api-host>/api/email-events/ses`, apply, and check
         the subscription shows `Confirmed` (`aws sns list-subscriptions-by-topic`).
 11. [ ] **App Service "Always On"** must be enabled on the API: its email workers run in-process.
+12. [ ] **MCP Registry domain proof.** At Namecheap → Advanced DNS, add `TXT` host `@` value
+        `v=MCPv1; k=ed25519; p=<PUBLIC_KEY>`. It proves `3dprintlog.com` to the official MCP Registry
+        so the API can publish `com.3dprintlog/printlog`. The key pair, the matching GitHub secret and
+        the publish job are in the API repo's
+        [`docs/mcp-registry-listing.md`](https://github.com/HoffmanEngineering/3d-print-log-api/blob/main/docs/mcp-registry-listing.md).
+        It must be on the apex, not a selector. On a key rotation, delete the old record, because the
+        registry tries a stale one first and fails. Like the other apex records, this one is managed
+        by hand, not by Terraform.
 
 ## Rotating the SES access key
 
